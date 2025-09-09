@@ -138,7 +138,7 @@ players |>
   filter(Team == "Maryland Terrapins Men's")
 ```
 
-**ANSWER** Who do you get as the first result, and what was his trueshooting percentage?
+**ANSWER** Who do you get as the first result, and what was his trueshooting percentage? Julian Reese and his true shooting percentage is 59.9. 
 
 
 So is 100 minutes our level? Here's the truth -- there's not really an answer here. We're picking a cutoff. If you can cite a reason for it and defend it, then it probably works.
