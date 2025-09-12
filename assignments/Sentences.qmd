@@ -1,0 +1,81 @@
+---
+title: "Sentences"
+format: html
+---
+
+```{r}
+library(tidyverse)
+
+totals_2024 <- read_csv("https://dwillis.github.io/sports-data-files/ncaa_womens_soccer_totals_2024.csv")
+matches_2024 <- read_csv("https://raw.githubusercontent.com/dwillis/NCAAWomensSoccerData/main/data/ncaa_womens_soccer_matchstats_2024.csv")
+```
+My question was: The most interesting question I have is why is the SWAC producing so many shots on target compared to other conferences? Is there a large disparity between the pedigree of SWAC attackers and defenders? So I'm going to start by creating a data frame with only the swac matches
+
+```{r}
+swac_teams <- c("Alabama A&M Bulldogs", "Alabama St. Lady Hornets", "Alcorn Lady Braves", "Ark.-Pine Bluff Lady Lions", "Grambling Lady Tigers", "Jackson St. Lady Tigers", "Mississippi Val. Devilettes", "Prairie View Lady Panthers", "Southern U. Lady Jaguars", "Texas Southern Lady Tigers")
+
+swac_matches <- matches_2024 |> 
+  filter(team %in% swac_teams)
+```
+
+Now I'm going to copy the code from the tutorial that led to my question:
+```{r}
+totals_2024 |>
+  group_by(conference_name) |>
+  summarize(
+    total_sog = sum(SoG),
+    total_shatt = sum(ShAtt)
+  ) |>
+  mutate(conference_pct = (total_sog/total_shatt)*100
+) |>
+  arrange(desc(conference_pct))
+```
+
+
+
+Now once again, like we did in class, I'm going to pull some averages data from their matches and compare it to the overall data starting with offensive metrics.
+
+```{r}
+swac_matches |> 
+  summarise(
+    mean_goals = mean(goals),
+    mean_sog = mean(so_g),
+    mean_assists = mean(assists),
+    mean_shots = mean(sh_att)
+    )
+matches_2024 |> 
+    summarise(
+    mean_goals = mean(goals),
+    mean_sog = mean(so_g),
+    mean_assists = mean(assists),
+    mean_shots = mean(sh_att)
+    )
+```
+
+Already we can see that the shot on goal percentage stat is misleading in terms of the idea that the SWAC is an offensive powerhouse of a conference. They are well below the average in overall production of shots, shots on goal, and most importantly goals. Now I will compare some defensive metrics.
+
+```{r}
+swac_matches |> 
+  summarise(
+    mean_oppgoals = mean(defensive_goals),
+    mean_oppsog = mean(defensive_so_g),
+    mean_oppassists = mean(defensive_assists),
+    mean_oppshots = mean(defensive_sh_att)
+    )
+matches_2024|> 
+  summarise(
+    mean_oppgoals = mean(defensive_goals),
+    mean_oppsog = mean(defensive_so_g),
+    mean_oppassists = mean(defensive_assists),
+    mean_oppshots = mean(defensive_sh_att)
+    )
+```
+
+Here the SWAC stands out even worse and are further away from the overall averages in the wrong direction.
+
+
+Based on this info here's how I'd lead a preview of Maryland vs. a SWAC Team:
+
+When the Terps welcome the Alabama A & M Bulldogs of the Southwestern Athletic Conference (SWAC) to Ludwig Field Sunday evening, they should expect offensive chances early and often. In 2024 the SWAC was one of the worst defensive conferences in college soccer, allowing opponents an average of over 2 goals per match and over 8 attempts on frame. 
+The Bulldogs should also struggle to generate chances on the Terps, with what is on paper an inferior offense, but if they do get chances, Faith Luckey will have to stay ready. Teams from the SWAC put a higher percentage of their shots on the frame of goal, than any other conference. in the country in 2024.
+
