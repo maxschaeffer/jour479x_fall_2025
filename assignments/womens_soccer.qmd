@@ -12,7 +12,7 @@ We'll want to start with 2025 match data, which is located in [this GitHub repos
 
 
 ```{r}
-matches_2025 <- read_csv("https://raw.githubusercontent.com/dwillis/NCAAWomensSoccerData/main/data/ncaa_womens_soccer_matchstats_2025.csv")
+matches_2025 <- read_csv("https://raw.githubusercontent.com/dwillis/NCAAWomensSoccerData/main/data/ncaa_womens_soccer_matchstats_2025.csv") |>  mutate(goal_diff = team_score - opponent_score, total_goals = goals + defensive_goals)
 ```
 
 Let's take a look at this data to see what it contains, using `head` and `glimpse`:
@@ -28,12 +28,14 @@ Now, onto the questions using aggregates, which means `group_by` and `summarize`
 
 ```{r}
  matches_2025 |> 
-  filter(team == "Maryland Terrapins, Terps") |> 
+ # filter(team == "Maryland Terrapins, Terps") |> 
+  group_by(team) |> 
   summarise(
     total_shots = sum(sh_att),
     total_sog = sum(so_g),
     sog_pct = total_sog/total_shots * 100
-  ) 
+  ) |> 
+arrange(desc(sog_pct))
 ```
 The Terps had 83 shots, and 45 on goal for a percentage of 54.2.
 
@@ -41,6 +43,7 @@ The Terps had 83 shots, and 45 on goal for a percentage of 54.2.
 
 ```{r}
 matches_2024 <- read_csv("https://raw.githubusercontent.com/dwillis/NCAAWomensSoccerData/main/data/ncaa_womens_soccer_matchstats_2024.csv")
+
 
 matches_2024 |> 
 filter(team == "Maryland Terrapins, Terps", 
@@ -79,9 +82,71 @@ corners_2025 <- matches_2025 |>
   ) |> 
   mutate(diff_corners= off_corners-def_corners)
 ```
-```
 Maryland has won 28 offensive corners while allowing 22 for a positive differential of six. 
 
 5. What's the most interesting thing you've seen from these questions?
 
+```{r}
+swac_teams <- c("Alabama A&M Bulldogs", "Alabama St. Lady Hornets", "Alcorn Lady Braves", "Ark.-Pine Bluff Lady Lions", "Grambling Lady Tigers", "Jackson St. Lady Tigers", "Mississippi Val. Devilettes", "Prairie View Lady Panthers", "Southern U. Lady Jaguars", "Texas Southern Lady Tigers")
+
+swac_matches <- matches_2025 |> 
+  filter(team %in% swac_teams)
+
+matches_2025 |> 
+  summarise(
+    mean_diff = mean(goal_diff),
+    mean_opp_goals = mean(defensive_goals),
+    mean_sog = mean(so_g),
+    mean_opp_sog = mean(defensive_so_g)
+    )
+swac_matches |> 
+  summarise(
+    mean_diff = mean(goal_diff),
+    mean_opp_goals = mean(defensive_goals),
+    mean_sog = mean(so_g),
+    mean_opp_sog = mean(defensive_so_g)
+    )
+big10 <- c("Nebraska Huskers", "Iowa Hawkeyes", "Minnesota Golden Gophers", "Illinois Fighting Illini", "Northwestern Wildcats", "Wisconsin Badgers", "Indiana Hoosiers", "Purdue Boilermakers", "Ohio St. Buckeyes", "Michigan Wolverines", "Michigan St. Spartans", "Penn St. Nittany Lions", "Rutgers Scarlet Knights", "Maryland Terrapins, Terps", "Southern California Trojans", "UCLA Bruins", "Washington Huskies", "Oregon Ducks")
+
+big10_matches <- matches_2025 |> 
+  filter(team %in% big10)
+
+big10_matches |> 
+  summarise(
+    mean_diff = mean(goal_diff),
+    mean_opp_goals = mean(defensive_goals),
+    mean_sog = mean(so_g),
+    mean_opp_sog = mean(defensive_so_g)
+  )
+big10_matches |> 
+  filter (team == "Maryland Terrapins, Terps") |> 
+  summarise(
+    mean_diff = mean(goal_diff),
+    mean_opp_goals = mean(defensive_goals),
+    mean_sog = mean(so_g),
+    mean_opp_sog = mean(defensive_so_g)
+  )
+
+```
+
+
 The most interesting thing I've found in these questions is a coorelation between the teams with the best corner differential and teams with positive records. The top five teams in corner differential have just two losses between them and both are to Illinois, who interestingly enough are undefeated with a corner differential of -12. I think this could lead to an interesting story on Illinois's tactics, do they prioritize building attacks through the middle? Are they more willing to concede corners defensively? I think these could be interesting things to look at through game tape and/or questions with their coach.
+
+
+
+NEW ASSIGNMENT 9/18
+
+
+```{r}
+
+matches_2025 <- read_csv("https://raw.githubusercontent.com/dwillis/NCAAWomensSoccerData/main/data/ncaa_womens_soccer_matchstats_2025.csv") |>  mutate(goal_diff = team_score - opponent_score, total_goals = goals + defensive_goals)
+
+matches_2024 <- read_csv("https://raw.githubusercontent.com/dwillis/NCAAWomensSoccerData/main/data/ncaa_womens_soccer_matchstats_2024.csv") |>  mutate(goal_diff = team_score - opponent_score, total_goals = goals + defensive_goals) |> filter(date < '2024-09-18' )
+
+```
+t-test
+
+```{r}
+t.test(matches_2024$total_goals, matches_2025$total_goals)
+```
+
