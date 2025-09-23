@@ -150,3 +150,95 @@ t-test
 t.test(matches_2024$total_goals, matches_2025$total_goals)
 ```
 
+
+## Correlations
+
+```{r}
+library(tidyverse)
+
+
+correlations <- read_csv("https://raw.githubusercontent.com/dwillis/NCAAWomensSoccerData/main/data/ncaa_womens_soccer_matchstats_2024.csv") 
+```
+
+```{r}
+newcorrelations <- correlations |> 
+  mutate(
+    differential = goals - defensive_goals
+    )
+
+newcorrelations |> summarise(correlation = cor(differential, fouls, method="pearson"))
+```
+
+```{r}
+newcorrelations |> summarise(correlation = cor(differential, yellow_cards, method="pearson"))
+```
+
+```{r}
+fit <- lm(differential ~ fouls, data = newcorrelations)
+summary(fit)
+```
+
+```{r}
+newcorrelations |> 
+  summarise(correlation = cor(differential, so_g, method="pearson"))
+```
+
+```{r}
+net <- lm(differential ~ so_g, data = newcorrelations)
+summary(net)
+```
+
+```{r}
+correlations25 <- read_csv("https://raw.githubusercontent.com/dwillis/NCAAWomensSoccerData/main/data/ncaa_womens_soccer_matchstats_2025.csv") 
+```
+
+```{r}
+newcorrelations25 <- correlations25 |> 
+  mutate(
+    differential = goals - defensive_goals
+    )
+```
+
+
+```{r}
+newcorrelations25 |> summarise(correlation = cor(differential, fouls, method="pearson"))
+```
+
+```{r}
+newcorrelations25 |> summarise(correlation = cor(differential, yellow_cards, method="pearson"))
+```
+
+```{r}
+newcorrelations25 <- newcorrelations25 |> 
+  mutate(sog_pct =so_g/sh_att)
+```
+
+```{r}
+newcorrelations25 |> summarise(correlation = cor(differential, sog_pct, method="pearson", use = "complete.obs"))
+```
+
+```{r}
+newcorrelations25 |> summarise(correlation = cor(differential, defensive_so_g, method="pearson", use = "complete.obs"))
+```
+```{r}
+newcorrelations25 |> 
+  filter(team == "Maryland Terrapins, Terps") |> 
+  summarise (mean_defsog = mean(defensive_so_g))
+
+newcorrelations25 |> 
+  summarise(mean_defsog = mean(defensive_so_g))
+```
+
+```{r}
+defensive_model <- lm(differential ~ defensive_so_g, data = newcorrelations25)
+summary(defensive_model)
+
+
+```
+
+```{r}
+(-0.437064 * 5.5) + 2.8170
+```
+
+
+With Maryland women's soccer off to an improved start in Big Ten play (already doubling their conference win total from last season), it is interesting to see what areas they are succeeding at (erelative to previous years). Across women's soccer there is a negative relationship between the amount of shots on goals teams concede and the results of their games. Maryland is right around the national average for now, using an improved defense to slightly outscore opponents. Can they keep that up against tougher B1G opponents? Probably not.
