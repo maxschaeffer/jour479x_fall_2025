@@ -1,0 +1,114 @@
+## Multiple Regression
+
+```{r}
+library(tidyverse)
+library(Hmisc)
+```
+
+```{r}
+logs <- read_csv("https://dwillis.github.io/sports-data-files/cbblogs1525.csv")
+```
+
+```{r}
+logs <- logs |> mutate(
+  Differential = TeamScore - OpponentScore, 
+  NetRebounds = TeamTotalRebounds - OpponentTotalRebounds,
+  TurnoverMargin = TeamTurnovers - OpponentTurnovers)
+
+```
+
+
+```{r}
+rebounds <- lm(Differential ~ NetRebounds, data=logs)
+summary(rebounds)
+```
+
+```{r}
+model1 <- lm(Differential ~ NetRebounds + TurnoverMargin, data=logs)
+summary(model1)
+```
+
+```{r}
+simplelogs <- logs |> select_if(is.numeric) |> select(-Game) |> select(Differential, NetRebounds, TurnoverMargin, TeamFGPCT, TeamTotalRebounds, OpponentFGPCT, OpponentTotalRebounds, TeamFTPCT, OpponentFTPCT)
+```
+
+
+```{r}
+cormatrix <- rcorr(as.matrix(simplelogs))
+
+cormatrix$r
+```
+
+```{r}
+model2 <- lm(Differential ~ NetRebounds + TurnoverMargin + TeamFGPCT + OpponentFGPCT, data=logs)
+summary(model2)
+```
+
+```{r}
+logs |> 
+  filter(Team == "Michigan" & Season == '2020-2021' | Team == "Wisconsin" & Season == '2019-2020' | Team == "Michigan State" & Season == '2018-2019' | Team == "Michigan State" & Season == '2017-2018' | Team == 'Illinois' & Season == '2021-2022' | Team == 'Purdue' & Season == '2022-2023' | Team == 'Purdue' & Season == '2023-2024' | Team == "Michigan State" & Season == '2024-2025') |> 
+  summarise(
+    meanNetRebounds = mean(NetRebounds),
+    meanTurnoverMargin = mean(TurnoverMargin),
+    meanTeamFGPCT = mean(TeamFGPCT),
+    meanOpponentFGPCT = mean(OpponentFGPCT),
+    meanFT = mean(TeamFTPCT),
+    MeanOppFT = mean(OpponentFTPCT)
+  )
+```
+
+
+```{r}
+# (netrebounds estimate * meanNetRebounds) + (turnover margin estimate * meanTurnoverMargin) + (TeamFGPCT estimate * meanTeamFGPCT) + (OpponentFGPCT estimate * meanOpponentFGPCT) + Intercept
+(0.660276*9.432099) + (-1.315355*1.711934) + (91.472656*0.4745391) + (-91.705986*0.4000823) + 0.230468
+```
+
+```{r}
+logs |> 
+  filter(
+    Team == "Maryland" & Season == '2024-2025'
+    ) |> 
+  summarise(
+    meanNetRebounds = mean(NetRebounds),
+    meanTurnoverMargin = mean(TurnoverMargin),
+    meanTeamFGPCT = mean(TeamFGPCT),
+    meanOpponentFGPCT = mean(OpponentFGPCT),
+    meanFT = mean(TeamFTPCT),
+    MeanOppFT = mean(OpponentFTPCT)
+  )
+```
+
+```{r}
+(0.660276*2.472222) + (-1.315355*-3.444444) + (91.472656*0.4687778) + (-91.705986*0.4150278) + 0.230468
+```
+
+
+```{r}
+logs |> 
+     filter(
+         Team == "Maryland" & Season == '2024-2025'
+     ) |> summarise(avg_score = mean(TeamScore), avg_opp = mean(OpponentScore))
+```
+
+I wouldn't want to remove any of the current factors from our model since I think they're all important predictors of team success and we seem to have a good model. One of the only things I'm going to add is FT Percentage, and Opponent FT Percentage, since it's something always referenced by coaches as a reason they lose or win games.
+
+
+```{r}
+model2 <- lm(Differential ~ NetRebounds + TurnoverMargin + TeamFGPCT + OpponentFGPCT + TeamFTPCT + OpponentFTPCT, data=logs)
+summary(model2)
+```
+
+
+
+
+```{r}
+( 0.626381 *9.432099) + (-1.296595 *1.711934) + (91.897259*0.4745391) + ( -92.100896 *0.4000823) + (0.7453868	* 11.244338) + (0.7160905 * -11.507524 ) +  0.410318 
+```
+
+
+```{r}
+(0.62638*2.472222) + (-1.296595*-3.444444) + (91.897259*0.4687778) + ( -92.100896*0.4150278) + (11.244338 * 0.7534167	) + (-11.507524 * 0.7403611) + 0.410318 
+```
+
+
+The free throw percentage stat made a pretty marginal difference increasing the model to .9063 a slight decrease to our residual standard error. The model also marginally increases the win margin for both Maryland and the means of previous Big Ten regular season champions. I would say, I don't see the harm in adding these two statistics to the model since it doesn't seem to make the data any less reliable, but the difference there making is negligible. If I were redoing it or starting from scratch I would maybe try to include a FT Margin stat, because that would be more consequential on a game's outcome. It would be interesting to try with the margin of makes and the margin of percentage and see which is a more useful indicator.
