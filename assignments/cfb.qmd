@@ -1,0 +1,49 @@
+## College Football Assignment
+
+```{r}
+library(tidyverse)
+library(Hmisc)
+```
+
+
+
+```{r}
+logs <- read_csv("https://dwillis.github.io/sports-data-files/footballlogs1124.csv")
+```
+
+```{r}
+logs <- logs |> mutate(differential= TeamScore -OpponentScore, YdsMargin = OffensiveYards - DefYards, PenaltyMargin = PenaltyYds - DefPenaltyYds) 
+```
+
+
+
+```{r}
+penalties <- lm(differential ~ Penalties, data = logs)
+summary(penalties)
+```
+
+Our P-Value is .004 making it low enough for our model to be considered statiscally significant and not results of random chance. Our R-Squared is extremely low, indicating that penalties barely account for score differential and are not a good predictor. I think our model is useful as a way of disproving the idea that penalties are a deciding factor of games. 
+
+
+
+```{r}
+mainmodel <- lm(differential ~ YdsMargin + PenaltyMargin + TotalTurnovers, data=logs)
+summary(mainmodel)
+```
+
+All in all I think these results say that I made a decent but not exceptional model. My extremely low p-value indicates that my results are not the product of random chance, and have statistical significance. My 11.54 residual standard error, suggest that there maybe some overlap between my determining factors of differential, but not so much that I used two identical markers. The most dissapointing part is that my R-Squared value suggests that the factors I chose account for under 75% of differential. Its still a large margin considering the complexities of an NFL game, but not as high as you'd like for a model you'd actually use for predictions.
+
+```{r}
+closegames <- logs |> filter(differential < 8)
+closemodel <- lm(differential ~ YdsMargin + PenaltyMargin + TotalTurnovers, data=closegames)
+summary(closemodel)
+```
+
+```{r}
+closepenalties <- lm(differential ~ Penalties, data = closegames)
+summary(closepenalties)
+```
+My model got much worse in close games, while it improved the number of residual standard errors my r-squared dropped to around 55 meaning my model is now accounting for under 60% of differential. The penalty model got marginally better, but still indicates that penalties are not a relevant predictor of score differential.
+
+I think I would learn what I used about penalties in journalism for sure. If I was writing for a blog or had a more creative opportunity to write wide-scope stories, I might write a story about the misconception that the number of penalties is a relevant factor in CFB game outcomes. If I was a beat writer it might be harder to write that as it's own story, but I think I couold use my data to ask more informed questions to a coach who pins a loss or win on penalties. If I were including a quote, I could follow up the next paragraph with "statistical analysis shows that penalties are an exceedingly small factor in the score differential of a college football game" or something along those lines.
+
