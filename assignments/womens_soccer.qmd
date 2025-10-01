@@ -242,3 +242,51 @@ summary(defensive_model)
 
 
 With Maryland women's soccer off to an improved start in Big Ten play (already doubling their conference win total from last season), it is interesting to see what areas they are succeeding at (erelative to previous years). Across women's soccer there is a negative relationship between the amount of shots on goals teams concede and the results of their games. Maryland is right around the national average for now, using an improved defense to slightly outscore opponents. Can they keep that up against tougher B1G opponents? Probably not.
+
+
+
+
+### Residuals
+
+```{r}
+matches_2025 <- matches_2025 |> mutate(sog_pct = (so_g/sh_att) * 100, assist_margin = assists-defensive_assists, def_sogpct = (defensive_so_g/defensive_sh_att)*100)
+```
+
+
+
+```{r}
+wsocmodel <- lm(goal_diff ~ sog_pct + assist_margin + defensive_so_g, data=matches_2025)
+summary(wsocmodel)
+```
+I selected shot on goal percentage and defensive shots on goal allowed to try and include standard measures of a team's offensive and defensive efficiency. I added assist margin to try and include a more creative factor to track teams that are more connected than their opponents. 
+
+I'm happy with this model. The R-Squared values are demonstrating that these three factors account for around 80% of goal differential, which is very solid. More than that though I am happy with the very low p-value meaning my results are not random chance.At first I thought I also had a very low residual standard error, but once I realized its on the scale of goals in a soccer match being off by a whole goal is a lot more significant so I actually would like that to be smaller (at least under one).
+
+```{r}
+matches_2025 <- matches_2025 |> filter(!is.na(sog_pct))
+
+matches_2025 <- matches_2025 |> mutate(predicted = predict(wsocmodel), residuals = residuals(wsocmodel))
+```
+
+
+```{r}
+matches_2025 |> arrange(desc(residuals)) |> select(date, team, opponent, outcome, goal_diff, assist_margin, sog_pct, defensive_so_g, predicted, residuals)
+```
+
+```{r}
+matches_2025 |> arrange(residuals) |> select(date, team, opponent, outcome, goal_diff, assist_margin, sog_pct, defensive_so_g, predicted, residuals)
+```
+
+I am glad to see that my residuals are often occuring in matches where the model predicted a relatively lopsided game like a win or loss by 3 + goals, and the game went that way, but was even more lopsided. I wouldn't really expect or want a soccer model to predict outcomes to be over five goals, because even in mismatches that's pretty hard to achieve. It also shows some of the potential problems with using shot on goal percentage as a predictor, because if you're getting such a high volume of shots on a team and missing a lot you can still outscore them by a lot just by pelting shots at them.
+
+```{r}
+matches_2025 |> arrange(desc(residuals)) |> filter(team=='Maryland Terrapins, Terps')|> select(date, team, opponent, outcome, goal_diff, assist_margin, sog_pct, defensive_so_g, predicted, residuals)
+```
+
+I think that if I was covering Maryland women's soccer I could use the information from these residuals in my coverage, but maybe not a full story. I would focus on their recent road trip to the west coast where they took two losses to USC and UCLA. UCLA is No. 4 in the country and the Terps lost by just a goal, while USC beat them by 3. 
+In both games though the model actually predicted a better result, in the UCLA game just barely, but in the USC game it predicted they would lose by just under a goal instead of the three that they did lose by, the second highest absolute value of any of their residuals.
+It's very common to see soccer coaches in particular say after a game "we deserved a better result than we got", "I thought the result was fair", or even sometimes "we were fortunate". I don't know if Marchiano engages in these kinds of quotes, but if he does this model would inform that they actually probably did deserve a bit more from the USC, and they really did play the UCLA game close.
+Essentially I think you could use this data to show that things that despite an 0-2 road trip, there are still some positives for the team.
+
+
+I think the UCLA result is the overall most surprising part of this analysis and honestly represents a really big step forward for the program. I think if I had a lot of time on my hands I would write a story on what the Terps did well in that game and how they can repeat it to try and pick up more positive results in conference. At face value that idea seems a little weird considering they lost, but in context of how bad they've been in the Big Ten and against the best teams in the country I think it would be a worthwhile article. 
