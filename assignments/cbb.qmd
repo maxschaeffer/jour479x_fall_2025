@@ -112,3 +112,111 @@ summary(model2)
 
 
 The free throw percentage stat made a pretty marginal difference increasing the model to .9063 a slight decrease to our residual standard error. The model also marginally increases the win margin for both Maryland and the means of previous Big Ten regular season champions. I would say, I don't see the harm in adding these two statistics to the model since it doesn't seem to make the data any less reliable, but the difference there making is negligible. If I were redoing it or starting from scratch I would maybe try to include a FT Margin stat, because that would be more consequential on a game's outcome. It would be interesting to try with the margin of makes and the margin of percentage and see which is a more useful indicator.
+
+
+
+## Residuals 
+
+
+```{r}
+logs <- read_csv("https://dwillis.github.io/sports-data-files/cbblogs1525.csv")
+```
+
+```{r}
+residualmodel <- logs |> mutate(differential = TeamScore - OpponentScore, FGPctMargin = TeamFGPCT - OpponentFGPCT) 
+
+
+fit <- lm(differential ~ FGPctMargin, data = residualmodel)
+summary(fit)
+```
+
+```{r}
+residualmodel <- residualmodel |> filter(!is.na(FGPctMargin))
+residualmodel <- residualmodel |> mutate(predicted = predict(fit), residuals = residuals(fit))
+
+```
+
+
+```{r}
+residualmodel |> filter(Team == 'Maryland') |> arrange(desc(residuals)) |> select(Date, Team, Opponent, W_L, differential, FGPctMargin, predicted, residuals)
+```
+
+
+```{r}
+fouls <- logs |> 
+  mutate(
+    differential = TeamScore - OpponentScore, 
+    TotalFouls = TeamPersonalFouls+OpponentPersonalFouls
+  )
+
+pfit <- lm(differential ~ TotalFouls, data = fouls)
+summary(pfit)
+```
+
+
+
+```{r}
+fouls <- fouls |> filter(!is.na(TotalFouls))
+fouls$predicted <- predict(pfit)
+fouls$residuals <- residuals(pfit)
+
+
+fouls |> arrange(desc(residuals)) |> select(Team, Opponent, W_L, TeamScore, OpponentScore, TotalFouls, residuals) |> filter(!is.na(Opponent))
+```
+
+
+## Z-Scores
+
+
+
+```{r}
+gamelogs <- read_csv("https://thescoop.org/sports-data-files/logs25.csv") 
+```
+
+
+```{r}
+teamquality <- gamelogs |> 
+  select(Conference, Team, TeamFGPCT, TeamTotalRebounds, OpponentFGPCT, OpponentTotalRebounds)
+```
+
+
+```{r}
+teamtotals <- teamquality |> 
+  group_by(Conference, Team) |> 
+  summarise(
+    FGAvg = mean(TeamFGPCT), 
+    ReboundAvg = mean(TeamTotalRebounds), 
+    OppFGAvg = mean(OpponentFGPCT),
+    OppRebAvg = mean(OpponentTotalRebounds)
+    ) 
+```
+
+
+```{r}
+teamzscore <- teamtotals |> 
+  mutate(
+    FGzscore = as.numeric(scale(FGAvg, center = TRUE, scale = TRUE)),
+    RebZscore = as.numeric(scale(ReboundAvg, center = TRUE, scale = TRUE)),
+    OppZscore = as.numeric(scale(OppFGAvg, center = TRUE, scale = TRUE)) * -1,
+    OppRebZScore = as.numeric(scale(OppRebAvg, center = TRUE, scale = TRUE)) * -1,
+    TotalZscore = FGzscore + RebZscore + OppZscore + OppRebZScore
+  )  
+```
+
+
+
+```{r}
+teamzscore |> 
+  filter(Conference == "Big Ten MBB") |> 
+  arrange(desc(TotalZscore)) |>
+  select(Team, TotalZscore)
+```
+
+```{r}
+powerfive_plus_one <- c("SEC MBB", "Big Ten MBB", "Pac-12 MBB", "Big 12 MBB", "ACC MBB", "Big East MBB")
+teamzscore |> 
+  filter(Conference %in% powerfive_plus_one) |> 
+  arrange(desc(TotalZscore)) |>
+  select(Team, TotalZscore)
+```
+

@@ -1,0 +1,57 @@
+---
+title: "wbb"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+```
+
+```{r}
+wbb_teams <- read_csv("https://dwillis.github.io/sports-data-files/wbbstats1525.csv")
+```
+
+```{r}
+wbb_avgs <- wbb_teams |> 
+  mutate(
+    rpg = TotalRebounds/Games,
+    OppPpg = OppPoints/Games,
+    Threepg = ThreePointMade/Games,
+    ToPg = Turnovers/Games,
+    Ppg = ForPoints/Games,
+  )
+```
+
+
+```{r}
+teamzscore <- wbb_avgs |> 
+  mutate(
+    OffZscore = as.numeric(scale(Ppg, center = TRUE, scale = TRUE)),
+    RebZscore = as.numeric(scale(rpg, center = TRUE, scale = TRUE)),
+    OppZscore = as.numeric(scale(OppPpg, center = TRUE, scale = TRUE)) * -1,
+    TurnoverZScore = as.numeric(scale(ToPg, center = TRUE, scale = TRUE)) * -1,
+
+    TotalZscore = OffZscore + RebZscore + OppZscore + TurnoverZScore
+  )  
+```
+
+
+```{r}
+teamzscore <- teamzscore |> 
+    arrange(desc(TotalZscore)) |> 
+select (School, Season, TotalZscore, OffZscore, RebZscore, OppZscore, TurnoverZScore )
+  
+```
+
+I accidentally created the Kim Mulkey Z-Score, because her teams half the top ten alongside a couple Geno Auriemma and Dawn Staley entries. No Maryland teams crack the elite ranks of my Z-Score. My elite teams don't seem to have the highest ZScore in any individual category, but they are over one in basically every category, doing all of them at an above average level.
+
+```{r}
+teamzscore <- teamzscore |> 
+  filter(School == "Maryland") |> 
+    arrange(desc(TotalZscore)) |> 
+select (School, Season, TotalZscore, OffZscore, RebZscore, OppZscore, TurnoverZScore )
+```
+
+My metric has Maryland's best years as 2020, 2016, 2017, and 2021 all where they posted Total Z-Scores over five. Their number one team is 2017, which makes sense because they only lost three games, but choked in the Sweet 16. They've never had a year with a negative ZScore in the last 10, with their worst being the last two, I'm suprised that last year was their second-worst, but their issues turning the ball over as well as some lackluster defensive efforts hurt them. Frese excels in the offensive Z Score category where she's posted two of the highest rated seasons ever.
+
+My best story idea would be who's been the best coach between Mulkey and Auriemma in the last 10 years. Their teams consistently show up as some of the best. For that article I think you could compare who's received the better influx of talent between the two by recruiting class rankings.
