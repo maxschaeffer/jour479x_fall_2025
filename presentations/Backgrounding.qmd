@@ -3,3 +3,17 @@ title: "Backgrounding"
 format: html
 ---
 
+```{r}
+library(tidyverse)
+```
+
+
+I've selected my NFL Penatlies idea. I was able to find the data online at a website called www.nflpenalties.com which contains week by week logs of every single penalty that occurs and a the data I want associated with it like down and distance and whether it was accepted or not. I was just going to use the data from this year since its most current and there are so many penalties week-to-week that it seems like a large enough sample size if I use the first fvie or six weeks of data for my project. The data was in a format where I was able to copy and paste it into a google sheet, which I then downloaded as a CSV file. I did this for the first two weeks, but could easily do it for the rest if you think this is a good system.
+
+The problem I have is that while this data can give me all the information I need about how many of the penalties I'm looking at occur and what percentage of the time they're accepted vs. declined at certain distances, it doesn't include the data about what happened the next play, and I'm not exactly sure where to find that, but with this data I figure at least I would know which specific plays I was looking for in which games. If you know a way to scrape full detailed PxP data though maybe it would make sense to just use that so its all in one place. 
+
+```{r}
+penalties <- read_csv("~/Downloads/NFL Penatlies Data - Sheet1.csv")
+```
+
+I don't think I'd need to augment or add to this data for the info on the penalties, rather simply filter through for the downs distances and factors I'm looking for while disregarding the things that don't matter as much to me like the ref crews involved. I"m excited to see your feedback on the best way to pursue this!
