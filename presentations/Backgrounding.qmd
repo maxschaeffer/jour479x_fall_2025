@@ -5,6 +5,7 @@ format: html
 
 ```{r}
 library(tidyverse)
+library(ggplot2)
 ```
 
 
@@ -17,3 +18,56 @@ penalties <- read_csv("~/Downloads/NFL Penatlies Data - Sheet1.csv")
 ```
 
 I don't think I'd need to augment or add to this data for the info on the penalties, rather simply filter through for the downs distances and factors I'm looking for while disregarding the things that don't matter as much to me like the ref crews involved. I"m excited to see your feedback on the best way to pursue this!
+
+
+## Exploration
+
+I'm going to try and incorporate the play-by-play data library Prof. Willis introduced me to.
+
+```{r}
+install.packages("nflfastR")
+install.packages("nflreadr")
+```
+
+```{r}
+twofivepxp <- read_csv("~/Downloads/play_by_play_2025.csv")
+```
+
+```{r}
+pxppenalties <- twofivepxp |> select(penalty_player_id, penalty, penalty_team, penalty_player_name, penalty_yards, penalty_team, down, ydstogo, desc, yards_gained)
+```
+
+This is an attempt to narrow some of that massive 372 column play-by-play data to sonme of the factors I'd need. I now need to figure out a way to select not only all the penalties, which should be simple enough, but also all the plays that follow it on that down and distance which I'm not sure how to do.
+
+
+```{r}
+casestudy <- penalties |> filter(Down == 2, Phase ==  "Offense")
+```
+
+```{r}
+ casestudy |> summarise( total_penalties = n(), declined_penalties = sum(Declined == "Yes"), declined_percentage = (declined_penalties/total_penalties) * 100
+)
+```
+
+
+```{r}
+ggplot() + 
+  geom_bar(
+    data = casestudy,
+    aes(x = "2nd Down Offense", fill = Declined),
+    position = "fill"   # stack bars to show proportions (100%)
+  ) +
+  scale_y_continuous(labels = scales::percent_format()) +
+  scale_fill_manual(values = c("No" = "steelblue", "Yes" = "tomato")) +
+  labs(
+    title = "Penalties on 2nd Down (Offense)",
+    x = "",
+    y = "Percentage of Penalties",
+    fill = "Declined?"
+  ) +
+  theme_minimal(base_size = 14)
+```
+
+I returned to our original data to create a specified file of the kind of instances I would be looking at. The data I used is only from a few weeks of the season, but I wanted to get an idea of how I would filter it and the main steps would be looking for offensive penalteis on second down, because these are the only situations that can create the kind of decisions for the coach that I want to know about. I then used AI to help me create a simple stacked bar chart with the casestudy data to demonstrate the percent of the time the penalties are declined which is relatively low as I expected. 
+
+Right now my biggest problem is figuring out how I'm going to isolate the data I need and whether I need to use a combination of the full pxp data and the penalty data or just stick to one or the other. My guess is it will be easier to just stick to the pxp data, but I do think the way the penalty data is formatted is cleaner for me to select the instances I need, but lacking in everything else. 
