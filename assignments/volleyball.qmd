@@ -178,3 +178,12 @@ That its not the best predictor of game outcomes as it's difficult to take teams
 
 I'd like to see the data we explored in the second half of the assignment for Big Ten teams only to see if the defensive hit percentage is a better predictor for conference play. I'd also like an interactive chart that tells you some of the outlier games so we can explore morre of the stats for the matches to see what's associated with bucking the usual trend. 
 Another statistic I'd like to look at isa hitting percentage stat which I looked up: (kills-errors/total attempts) and to see if that's a good predictor of success.
+
+
+## Dumbell Chart
+
+```{r}
+library(tidyverse)
+library(ggalt)
+```
+

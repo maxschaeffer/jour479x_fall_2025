@@ -30,7 +30,7 @@ install.packages("nflreadr")
 ```
 
 ```{r}
-twofivepxp <- read_csv("~/Downloads/play_by_play_2025.csv")
+twofivepxp <- read_csv("play_by_play_2025.csv")
 ```
 
 ```{r}
@@ -71,3 +71,98 @@ ggplot() +
 I returned to our original data to create a specified file of the kind of instances I would be looking at. The data I used is only from a few weeks of the season, but I wanted to get an idea of how I would filter it and the main steps would be looking for offensive penalteis on second down, because these are the only situations that can create the kind of decisions for the coach that I want to know about. I then used AI to help me create a simple stacked bar chart with the casestudy data to demonstrate the percent of the time the penalties are declined which is relatively low as I expected. 
 
 Right now my biggest problem is figuring out how I'm going to isolate the data I need and whether I need to use a combination of the full pxp data and the penalty data or just stick to one or the other. My guess is it will be easier to just stick to the pxp data, but I do think the way the penalty data is formatted is cleaner for me to select the instances I need, but lacking in everything else. 
+
+
+
+## Refining
+
+I'm going to try and get to my central question by using the full play by play data and the lead function that Prof. Willis referred me to.
+
+
+```{r}
+twofivepxp <- twofivepxp |> 
+  group_by(game_id) |> 
+  arrange(play_id, .by_group = TRUE) |> 
+  mutate(
+    next_play_down = if_else(down == 2 & !is.na(penalty_type),
+                             lead(down, 1),
+                             NA_integer_),
+    next_play_yards = if_else(down == 2 & !is.na(penalty_type),
+                             lead(yards_gained, 1),
+                             NA_integer_),
+    next_play_togo = if_else(down == 2 & !is.na(penalty_type),
+                             lead(ydstogo, 1),
+                             NA_integer_),
+  ) |> 
+  ungroup()
+```
+
+With the help of internet research and AI I was able to create columns that will show in instances of second down penalties what the down of the next play was, the distance to the first down marker, and the amount of yards gained, which will tell me if they put the offense in a more or less beneficial position than if they had declined the penalty. Now I'm going to try to start narrowing down the massive data set to some of the factors I will need to answer my question.
+
+```{r}
+second_down_penalties <- twofivepxp |>
+  filter(down == 2, !is.na(penalty_type))
+```
+
+This isolates all our second down penalties into one dataset. Now I want to try and include the next play columns I created with lead.
+
+
+```{r}
+penalty_analysis <- second_down_penalties |>
+  select(
+    game_id,
+    play_id,
+    posteam,
+    defteam,
+    down,
+    ydstogo,
+    yardline_100,
+    play_type,
+    yards_gained,
+    penalty_type,
+    penalty_team,
+    desc,
+    penalty_yards,
+    next_play_down,
+    next_play_yards,
+    next_play_togo
+  )
+```
+
+Now I have a data set with most of the information I'm interested in I want to try, but this still features a lot of plays that aren't going to be relevant to my question. I'm going to keep messing with filters to figure out which ones get me closer to an answer to my actual question.
+
+```{r}
+penalty_analysis <- penalty_analysis |> filter(penalty_type == "Offensive Holding") |> mutate(if_declined = ydstogo - yards_gained , after_accepted = next_play_togo - next_play_yards) 
+
+penalty_analysis <- penalty_analysis |> filter(if_declined > 7)
+```
+
+I decided to just use offensive holding penalties since it was the easiest way to control for the exact situations I was looking into. Interestingly there has not been a single declined holding penalty on second down this season, I also filtered for plays where the offense would be in situations of 3rd and 8 or longer if the defense delcied it since thats what I wanted to look into.
+
+```{r}
+summary <- penalty_analysis |> summarise (if_declined_mean= mean(if_declined), if_accepted_mean = mean(after_accepted)
+)
+
+summary_long <- summary |>
+  pivot_longer(
+    cols = c(if_declined_mean, if_accepted_mean),
+    names_to = "decision",
+    values_to = "average_value"
+  )
+```
+
+
+```{r}
+ggplot(summary_long, aes(x = decision, y = average_value, fill = decision)) +
+  geom_col(width = 0.4) +
+  geom_text(aes(label = round(average_value, 2)), vjust = -0.3, size = 5) +
+  labs(
+    title = "Average Outcome: Accepted vs. Declined Penalties",
+    x = "Decision",
+    y = "Mean Value"
+  ) +
+  theme_minimal()
+```
+
+
+Then I found averages of how many yards from the sticks the offense would end upbeing on 3rd down if they declined the hold vs accepted it and the data is  on the side of the NFL teams that accepting the penalty is the correct decision on average putting teams in further third and longs. This leaves me with a few follow-up questions as I continue to look into the data. How far would the 3rd down have to be if accepted for the data to flip? Also, this is strictly measuring outcomes, but what do more advanced analytics like EPA show is the correct choice in this situation?
