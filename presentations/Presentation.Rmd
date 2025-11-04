@@ -1,0 +1,176 @@
+---
+title: "Presentation"
+output: html_document
+---
+My project will be a statistical analysis of what situations NFL teams should decline holding penalties in on second down. My initial hypothesis was that if declining the penalty would set up 3rd and 8 or longer, the team should decline it. 
+
+Initially I need to load my libraries. I will be working in the tidyverse and loading in nflfastR and nflreadr which gives me access to full play by play NFL data from this season. 
+
+```{r}
+library(tidyverse)
+install.packages("nflfastR")
+install.packages("nflreadr")
+```
+Now that I have the libraries loaded I can create a data frame to hold our 2025 play-by-play data. I initially thought I was going to use a sheet that featured every penalty from 2025, but due to the need for data from the next plays I pivoted to only using the play-by-play data.
+
+```{r}
+twofivepxp <- read_csv("play_by_play_2025.csv")
+```
+The next step was to figure out how to collect the data of the plays I need which is the penalties and the plays that follow them. With the help of Prof. Willis and AI I was able to figure out a function called lead to collect information on the plays that follow 2nd down penalties.
+
+Once I created that data I needed to continue to narrow down my data to the factors that I needed to do my analysis. Because of the format of my data I decided to just look at Offensive Holding penalties since they're 10 yards and one of the most common offensive penalties to serve as a case study. I chose holdings because I wanted a 10 yard penalty, because I think 15 yards is almost always an obvious acceptance and 5 is pretty insignificant
+
+I also created new columns that show where the team would have ended up relative to the yards needed for a first down if they had declined the penalty and how far they were after accepting it. At first I was shocked to see that it seemed no one had declined a second down holding penalty, but I later realized my play-by-play data doesn't register plays as penalties when their declined. Still I can use the accepted penalties to evaluate whether the teams made the right decisino and whether they got the offense in a longer third down then they would have had they declined it.
+```{r}
+twofivepxp <- twofivepxp |> 
+  group_by(game_id) |> 
+  arrange(play_id, .by_group = TRUE) |> 
+  mutate(
+    next_play_down = if_else(down == 2 & !is.na(penalty_type),
+                             lead(down, 1),
+                             NA_integer_),
+    next_play_yards = if_else(down == 2 & !is.na(penalty_type),
+                             lead(yards_gained, 1),
+                             NA_integer_),
+    next_play_togo = if_else(down == 2 & !is.na(penalty_type),
+                             lead(ydstogo, 1),
+                             NA_integer_),
+    next_play_epa = if_else(down == 2 & !is.na(penalty_type),
+                            lead(epa, 1),
+                            NA_integer_),
+  ) |> 
+  ungroup()
+
+second_down_penalties <- twofivepxp |>
+  filter(down == 2, !is.na(penalty_type))
+
+penalty_analysis <- second_down_penalties |>
+  select(
+    game_id,
+    play_id,
+    posteam,
+    defteam,
+    down,
+    ydstogo,
+    yardline_100,
+    play_type,
+    yards_gained,
+    penalty_type,
+    penalty_team,
+    desc,
+    penalty_yards,
+    next_play_down,
+    next_play_yards,
+    next_play_togo
+  )
+
+penalty_analysis <- penalty_analysis |> filter(penalty_type == "Offensive Holding") |> mutate(if_declined = ydstogo - yards_gained , after_accepted = next_play_togo - next_play_yards) 
+
+
+
+```
+
+Then I had to get the means of my new columns and re-arrange the data so that it's easier to use in ggplot to create a visualization.
+```{r}
+summary <- penalty_analysis |> summarise (if_declined_mean= mean(if_declined), if_accepted_mean = mean(after_accepted)
+)
+
+summary_long <- summary |>
+  pivot_longer(
+    cols = c(if_declined_mean, if_accepted_mean),
+    names_to = "decision",
+    values_to = "average_value"
+  )
+```
+
+Then I create my first visualization showing whether on average it was more succesful to decline or accept the penalties.
+
+```{r}
+ggplot(summary_long, aes(x = decision, y = average_value, fill = decision)) +
+  geom_col(width = 0.4) +
+  geom_text(aes(label = round(average_value, 2)), vjust = -0.3, size = 5) +
+  labs(
+    title = "Third Down Distance after Second Down Holding Penalties",
+    subtitle = "In situations of third and seven or longer on average teams are better off accepting",
+    x = "Decision",
+    y = "Distance on third down",
+       fill = "Decision"  # legend title
+  ) +
+  scale_fill_manual(
+    values = c("if_accepted_mean" = "blue", "if_declined_mean" = "red"),
+    labels = c("Accepted", "Declined")
+  ) +
+  theme_minimal()
+```
+
+So I had to rethink my later strategy and return to my initial data from NFLPenalties.com Since I have narrowed down my focuse to holds I was able to copy a CSV of every offensive hold so far this season. 
+
+```{r}
+holding <- read_csv("Holding.csv")
+```
+Then I narrowed that down to second down holds and filtered them so its only the offensive ones, not special teams,  that were declined. Once I had all those I cross-referenced those to my full play-by-play to figure out what the 3rd down distance the opted for over the 2nd down they would have had had they accepted it. I then manually added those columns into the csv and created a new one with just the relevant plays I wanted to look at.
+
+```{r}
+seconddownholds <- holding |> 
+  filter(
+  Down == 2, Phase == "Offense", Declined == "Yes"
+  )
+```
+
+Then I wanted to creatae a dumbell plot to show the distance between the 2nd and 3rd down in situations where the team declined, but first I had to change my data around to format it for the chart.
+```{r}
+declinedseconddownholds <- read_csv("Declined.csv")
+library(ggalt)
+
+declinedseconddownholds <- declinedseconddownholds |> 
+  mutate(Beneficiary_id = paste0(Beneficiary, "_", row_number()))
+
+declinedseconddownholds <- declinedseconddownholds |> 
+  mutate(
+    diff = Chose3rdAnd - Not2ndAnd,  
+    Beneficiary_id = reorder(Beneficiary_id, diff)  
+  )
+
+```
+
+
+```{r}
+ggplot(declinedseconddownholds) + 
+  geom_dumbbell(
+    aes(y=Beneficiary_id , x=Chose3rdAnd, xend=Not2ndAnd),
+    size = 2,
+    colour = "grey",
+    colour_x = "green",
+    colour_xend = "red") + 
+  scale_x_continuous(expand = c(0, 0), limits = c(0, 35)) + 
+  scale_y_discrete(limits = rev(levels(declinedseconddownholds$Beneficiary_id))) +
+   scale_color_manual(
+    name = "Scenario",
+    values = c("Chose 3rd And" = "green", "Not 2nd And" = "red")
+  ) +
+geom_text(
+    aes(x = Chose3rdAnd, y = Beneficiary_id, 
+        label = round(Chose3rdAnd, 1)), 
+    vjust = -0.5, hjust = -0.3, color = "green", size = 3.5
+  ) +
+  geom_text(
+    aes(x = Not2ndAnd, y = Beneficiary_id, 
+        label = round(Not2ndAnd, 1)), 
+    vjust = -0.5, hjust = 1.3, color = "red", size = 3.5
+  ) +
+  labs(
+    title = " 2025 Declined Second Down Holds",
+    subtitle = "Green = Chose 3rd And, Red = Not 2nd And",
+    x = "Yards to First Down",
+    y = "Deciding Team"
+  )+
+  theme_minimal() + 
+  theme(
+    legend.position = "top",
+    legend.title = element_text(face = "bold"),
+    plot.title = element_text(face = "bold", size = 14),
+    plot.subtitle = element_text(size = 11)
+  )
+```
+
+This is my final graph to look at the situations in which teams have actually declined. I ordered by largest discrepancy of what they turned down for what they took. 
