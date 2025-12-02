@@ -68,3 +68,42 @@ upsets <- marchgames |>
 ```{r}
 names(marchgames)
 ```
+
+```{r}
+twentyfive <- read_csv("team_box_2025.csv")
+twentyfour <- read_csv("team_box_2024.csv")
+twentythree <- read_csv("team_box_2023.csv")
+twentytwo <- read_csv("team_box_2022.csv")
+twentyone<- read_csv("team_box_2021.csv")
+nineteen <- read_csv("team_box_2019.csv")
+eighteen <- read_csv("team_box_2018.csv")
+seventeen <- read_csv("team_box_2017.csv")
+sixteen <- read_csv("team_box_2016.csv")
+fifteen <- read_csv("team_box_2015.csv")
+```
+
+```{r}
+last10 <- list(
+  fifteen,
+  sixteen,
+  seventeen,
+  eighteen,
+  nineteen,
+  twentyone,
+  twentytwo,
+  twentythree,
+  twentyfour,
+  twentyfive
+)
+
+last10 <- bind_rows(last10)
+postseason <- last10 |> filter(season_type == "3")
+```
+
+
+I was able to attempt Derek's suggestion of loading in the Sportsverse data which has the identifier of a post vs regular season game, which I'm direly missing in the other dataset. There are two main problems with this one though. A. it's one sided data, so I couldn't do comparative stats like turnover or rebounding margin. There might be a fix where I can combine the two since the rows of the teams that played each other are stacked on top of each other in the data. The other problem is not only is there no seed data, there's no conference data so I can't even filter for mid-majors beating P6s like I did in my previous data. 
+
+Do you think there's a solution to this or should I resort back to your other suggestion and just do all upsets of mid-majors over p6s using my first dataset. I'm leaning toward the second option, but if you think there's a good solution for the Sportsverse data I'm 100% open.
+
+As far as data visualization one that I think I could do is a dumbell chart. The chart would be titled something like "How do college basketball upsets happen?" Then I would compare the performance of the upseting team in certain statistical categories vs. the national average in that same category. I would order it in descending order from the largest margin over the average to show which stats are the most relevant and then less necessary for an upset from there. 
+
