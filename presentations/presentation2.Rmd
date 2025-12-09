@@ -15,6 +15,8 @@ There are some obvious problems with this method, the biggest one being that thi
 library(tidyverse)
 library(hoopR)
 library(lubridate)
+library(purrr)
+library(tidyr)
 ```
 
 
@@ -36,14 +38,22 @@ marchgames <- logs |>
 
 
 ```{r}
+
 power6 <- c(
   "ACC", "ACC MBB", "Big Ten", "Big Ten MBB", "Big 12", "Big 12 MBB", "SEC", "SEC MBB", "Pac-12", "Pac-12 MBB", "Big East", "Big East MBB", "Gonzaga"
 )
 
-marchgames <- marchgames|> 
+extra_power <- c(
+"Brigham Young",  "Central Florida", "Cincinnati", "Connecticut", 
+  "Houston", "Memphis", "Oregon State", 
+  "Southern Methodist", "UCF", "Washington State"
+)
+
+
+logs <- logs |>  
   mutate(
     Classification = if_else(
-      Conference %in% power6 | Team == "Gonzaga",
+      Conference %in% power6 | Team %in% extra_power,
       "Power",
       "Mid-Major"
     )
@@ -52,58 +62,53 @@ marchgames <- marchgames|>
 
 
 ```{r}
-classifications <- marchgames |> 
-  distinct(Team, Classification)
+classifications <- logs |> 
+  group_by(Team) |> 
+  summarize(Classification = first(Classification), .groups = "drop")
 
-marchgames <- marchgames |> 
+logs <- logs |> 
+  select(-matches("Classification_team|Classification_opp")) |> 
   left_join(classifications, by = "Team", suffix = c("", "_team")) |> 
   left_join(classifications, by = c("Opponent" = "Team"), suffix = c("", "_opp"))
 
 
-upsets <- marchgames |> 
+upsets <- logs |> 
   filter(Classification_team == "Mid-Major",
          Classification_opp == "Power",
          W_L == "W")
-```
-```{r}
-names(marchgames)
-```
 
-```{r}
-twentyfive <- read_csv("team_box_2025.csv")
-twentyfour <- read_csv("team_box_2024.csv")
-twentythree <- read_csv("team_box_2023.csv")
-twentytwo <- read_csv("team_box_2022.csv")
-twentyone<- read_csv("team_box_2021.csv")
-nineteen <- read_csv("team_box_2019.csv")
-eighteen <- read_csv("team_box_2018.csv")
-seventeen <- read_csv("team_box_2017.csv")
-sixteen <- read_csv("team_box_2016.csv")
-fifteen <- read_csv("team_box_2015.csv")
+upsets <- upsets |> 
+  distinct(Team, Opponent, Date, .keep_all = TRUE)
 ```
 
 ```{r}
-last10 <- list(
-  fifteen,
-  sixteen,
-  seventeen,
-  eighteen,
-  nineteen,
-  twentyone,
-  twentytwo,
-  twentythree,
-  twentyfour,
-  twentyfive
-)
-
-last10 <- bind_rows(last10)
-postseason <- last10 |> filter(season_type == "3")
+upsets <- upsets |> 
+  dplyr::select(Team, everything())
 ```
 
 
-I was able to attempt Derek's suggestion of loading in the Sportsverse data which has the identifier of a post vs regular season game, which I'm direly missing in the other dataset. There are two main problems with this one though. A. it's one sided data, so I couldn't do comparative stats like turnover or rebounding margin. There might be a fix where I can combine the two since the rows of the teams that played each other are stacked on top of each other in the data. The other problem is not only is there no seed data, there's no conference data so I can't even filter for mid-majors beating P6s like I did in my previous data. 
+```{r}
+upsets_avgs <- upsets |> 
+  summarise(
+    avgfgpct = mean(TeamFGPCT)
+    avg
+  )
+```
 
-Do you think there's a solution to this or should I resort back to your other suggestion and just do all upsets of mid-majors over p6s using my first dataset. I'm leaning toward the second option, but if you think there's a good solution for the Sportsverse data I'm 100% open.
+I had a very difficult and long battle with my code to figure out what was causing some of the problems. First I tried to use the sports betting hoopR (I deleted the code form my attempts), but it doesn't have a data frame that features the lines just team box scores and then a feature that can call the line for a game if you feed it the ID. 
 
-As far as data visualization one that I think I could do is a dumbell chart. The chart would be titled something like "How do college basketball upsets happen?" Then I would compare the performance of the upseting team in certain statistical categories vs. the national average in that same category. I would order it in descending order from the largest margin over the average to show which stats are the most relevant and then less necessary for an upset from there. 
+I tried to use AI to stitch that on top of the full box score data frame, but was unsuccesful and almost crashed my R. I returned to my original plan of using mid-major team's defeating power-conference teams and removed my previous March filter(per your advice)
+
+This still lead to a range of problems in my data, like certain teams that had multiple identifiers and didn't go in their proper categories and then individual games being counted numeerous times. Eventually I was able to trouble shoot all of those.
+
+I now finally have a bunch of stats, that I want to compare the performance of winning teams in upsets to vs. the overall average from our complete logs. If I come across multiple stats where there's a significant outperformance of the average by team's in upsets, I was thinking I'd create a dumbell plot to demonstrate the difference. If I just have one or two maybe just a simpler stacked bar chart. 
+
+Then I was going to create a model and look at some of the biggest residuals for my upset games, my question is what kind of data visualization should I build off that. You metnioned a scatterplot, but I'm not picturing exactly how that played out.
+
+Lastly, I'm going to put together a visualizatoin to show the teams that have the most upsets vs. have been upset the most. I know that's not what you want my project to be principally focused on, but think it will be a fun thing to include and can contribute to my story.
+
+
+
+
+
 
