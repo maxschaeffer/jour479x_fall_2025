@@ -3,39 +3,24 @@ title: "presentation2"
 output: html_document
 ---
 
-All the following code summarizes my attempts to just get a clean dataframe that is isolating tournament games and then. within that tournament games where upsets occur. That has proved a lot more difficult then I expected. I tried a bunch of different resources I found online as well as loading the game logs we've used in class.
+For my final project I wanted to explore college basketball and what leads to Mid-Major programs pulling off upsets. First things first I need to load various libraries that I'll use.
 
-There is some data online at a resource called Kaggle that seemingly has tournament-specific detailed game logs available, but despite multiple attempts I couldn't find any way to download it. What I need is just data that specifies whether games are in the tournament or not and preferably team's seeds so I could set filters for tournament games where a seed low enough beats a seed high enough then start looking at stats.
-
-The best I was able to do was use the game log data we have from class, and set teams into classifications of Power6 + Gonzaga and then everybody else as mid-major. From there I was able to make a dataframe where in the date range of when the tournament is typically going on a mid-major beat a powersix team. 
-
-There are some obvious problems with this method, the biggest one being that this is going to include not just games in the NCAA tournament, but other postseason tournaments like the CBI or NIT which I don't care about. Additionally, a powersix team losing to a mid-major doesn't guarantee it was an upset. My biggest question is do you have a dataset that you think would be better that I can use? If not, should I proceed with my upset dataframe or pivot to a different idea using CBB game logs? 
 
 ```{r}
 library(tidyverse)
-library(hoopR)
+library(ggrepel)
 library(lubridate)
 library(purrr)
 library(tidyr)
 ```
 
-
+My initial hope was to explore tournament upsets since those are the most dramatic and what make people fall in love with college basketball. This data proved more difficult then I expected to obtain, so I pivoted to using full game log data and looking at any games where non-power conference teams beat power-conference teams (more on the distinction in a minute). Although, not as many people are likely interested in Dayton beating Florida State in December as they are in UMBC beating Virginia in March, looking at the full year of data should give me a more extensive dataset and help me find more statistically significant overall trends.
 
 ```{r}
 logs <- read_csv("https://thescoop.org/sports-data-files/cbblogs1526.csv")
-mbb_pbp <- hoopR::load_mbb_pbp()
-boxes <- hoopR::load_mbb_team_box() 
 ```
 
-```{r}
-logs$Date <- as.Date(logs$Date)
-marchgames <- logs |> 
-  filter(
-    (month(Date) == 3 & day(Date) >= 10) |  
-    (month(Date) == 4 & day(Date) <= 30)     
-  )
-```
-
+Then came delegating teams into their respective areas, which is more tricky then I'd like it to be. For starters I delegated the obvious power conferences: ACC, Big Ten, Big 12, SEC, Pac-12(RIP/welcome back?), and the Big East. Since my data spans back to the 2014-15 season though, there are a lot of schools that moved in or out of power conferences during the realignment process so I decided to delegate those as power as well. Then obviously as any fans of the blog https://www.midmajormadness.com/ know: Gonzaga is not a mid-major.
 
 ```{r}
 
@@ -60,11 +45,13 @@ logs <- logs |>
   )
 ```
 
-
+From here I set up a data frame to find all the victories for midmajors over power conferences in the years my data spans. 
 ```{r}
 classifications <- logs |> 
   group_by(Team) |> 
   summarize(Classification = first(Classification), .groups = "drop")
+
+logs <- logs |> mutate(Margin = TeamScore - OpponentScore)
 
 logs <- logs |> 
   select(-matches("Classification_team|Classification_opp")) |> 
@@ -84,31 +71,234 @@ upsets <- upsets |>
 ```{r}
 upsets <- upsets |> 
   dplyr::select(Team, everything())
+
+upsets <- upsets |> 
+  filter(Team != "Gonzaga")
 ```
+
+From here I had to modify some of my data as I prepared to create a predictive model for winning college basketball games.
 
 
 ```{r}
-upsets_avgs <- upsets |> 
-  summarise(
-    avgfgpct = mean(TeamFGPCT)
-    avg
+winlosslogs <- logs |> 
+  mutate(winloss = case_when(
+    grepl("W", W_L) ~ 1, 
+    grepl("L", W_L) ~ 0)
+) 
+
+winlosslogs <- winlosslogs |> 
+  mutate(
+    ToMargin = TeamTurnovers - OpponentTurnovers,
+    threepointdiscrepancy = Team3PPCT - Opponent3PPCT,
+    FTmargin = TeamFTA - OpponentFTA
+  )
+
+winlosslogs <- winlosslogs |>
+  filter(!is.na(ToMargin) & !is.na(threepointdiscrepancy) & !is.na(TeamFTA))
+
+modelwinlosslogs <- winlosslogs |> mutate(Season = str_extract(Season, "\\d{4}$")) |> 
+  filter(Season < 2025 )
+
+```
+
+Then I made my model, focusing on turnover margin, the margin in three point percentage, and then margin in free throws attempted. These are three factors I believe to be highly important in college game and my model and it's output supported that. 
+
+```{r}
+model <- glm(
+  winloss ~ ToMargin + threepointdiscrepancy + FTmargin, 
+  data = modelwinlosslogs, 
+  family = binomial
+)
+
+summary(model)
+
+```
+I then modified my logs to include some of the predictions my model made.
+
+```{r}
+modelwinlosslogs <- modelwinlosslogs |> mutate(predicted_prob = predict(model, type="response"))
+
+modelwinlosslogs <- modelwinlosslogs |> mutate(predicted_outcome = ifelse(modelwinlosslogs$predicted_prob > 0.5, 1, 0))
+
+table(Actual = modelwinlosslogs$winloss, 
+      Predicted = modelwinlosslogs$predicted_outcome)
+
+mean(modelwinlosslogs$predicted_outcome == modelwinlosslogs$winloss, na.rm = TRUE)
+```
+
+```{r}
+
+modelwinlosslogs <- modelwinlosslogs |> 
+  dplyr::select(Team, everything())
+
+modelwinlosslogs |> filter(winloss == "1") |> 
+arrange(predicted_prob) |> 
+select(Team, Date, Opponent, TeamScore, OpponentScore, ToMargin, threepointdiscrepancy,FTmargin, predicted_prob)
+```
+
+I used the statistics to create my model based on the season from 2014-15 to 2023-24 in order to be able to use it to make predictions for last season and this current one. I returned to upsets data frame to have the model predict wins or losses in all the upset games based on my chosen statistics.
+
+```{r}
+
+
+
+upsets <- upsets |> mutate(
+   ToMargin = TeamTurnovers - OpponentTurnovers,
+    threepointdiscrepancy = Team3PPCT - Opponent3PPCT,
+    FTmargin = TeamFTA - OpponentFTA
+)
+
+upsets <- upsets |> 
+  mutate(winloss = case_when(
+    grepl("W", W_L) ~ 1, 
+    grepl("L", W_L) ~ 0)
+) 
+
+pred_probs <- predict(
+  model, 
+  newdata = upsets,
+  type = "response"
+)
+
+upsets <- upsets |> 
+  mutate(
+    predicted_prob=pred_probs
   )
 ```
 
-I had a very difficult and long battle with my code to figure out what was causing some of the problems. First I tried to use the sports betting hoopR (I deleted the code form my attempts), but it doesn't have a data frame that features the lines just team box scores and then a feature that can call the line for a game if you feed it the ID. 
-
-I tried to use AI to stitch that on top of the full box score data frame, but was unsuccesful and almost crashed my R. I returned to my original plan of using mid-major team's defeating power-conference teams and removed my previous March filter(per your advice)
-
-This still lead to a range of problems in my data, like certain teams that had multiple identifiers and didn't go in their proper categories and then individual games being counted numeerous times. Eventually I was able to trouble shoot all of those.
-
-I now finally have a bunch of stats, that I want to compare the performance of winning teams in upsets to vs. the overall average from our complete logs. If I come across multiple stats where there's a significant outperformance of the average by team's in upsets, I was thinking I'd create a dumbell plot to demonstrate the difference. If I just have one or two maybe just a simpler stacked bar chart. 
-
-Then I was going to create a model and look at some of the biggest residuals for my upset games, my question is what kind of data visualization should I build off that. You metnioned a scatterplot, but I'm not picturing exactly how that played out.
-
-Lastly, I'm going to put together a visualizatoin to show the teams that have the most upsets vs. have been upset the most. I know that's not what you want my project to be principally focused on, but think it will be a fun thing to include and can contribute to my story.
 
 
+```{r}
+upsetsnew <- upsets |> filter(Season%in% c("2024-2025", "2025-2026"))
+
+upsetsnew |>  filter(winloss == "1") |> 
+arrange(predicted_prob) |> 
+select(Team, Date, Opponent, TeamScore, OpponentScore, ToMargin, threepointdiscrepancy,FTmargin, predicted_prob)
+
+upsetsnew <- upsetsnew |> mutate(Margin = TeamScore - OpponentScore)
 
 
+upsetsnew <- upsetsnew |> 
+  mutate(month=month(Date))
+```
+The model was mostly accurate in its predictions, predicting an over 50% chance of victory for the winning team in a significant majority of the upset games that existed, but it had its fair share of misses too. I decided to break down the games it missed by time of year to see if there were interesting trends.
+
+```{r}
+ggplot(upsetsnew, aes(x = factor(month), y = predicted_prob)) +
+  geom_point(alpha = 0.6, size = 2) +
+  labs(
+    title = "Least predictable upsets often happen in November",
+    x = "Month",
+    y = "Win probability for eventual winning team"
+  ) +
+  geom_hline(yintercept=0.25) +
+  theme_minimal()
+```
+
+The ones the model was most off on, AKA an under 25 percent probabliity of a victory for the eventual winning team, happened mostly in November. 
 
 
+```{r}
+shockers <- upsetsnew |> 
+  filter(predicted_prob < 0.5)
+
+combined <- data.frame(
+  dataset = rep(c("upsetsnew", "shockers"), each = 2),
+  category = rep(c("N", "Not N"), times = 2),
+  percentage = c(
+    sum(upsetsnew$HomeAway == "N", na.rm = TRUE) / nrow(upsetsnew) * 100,
+    100 - (sum(upsetsnew$HomeAway == "N", na.rm = TRUE) / nrow(upsetsnew) * 100),
+    sum(shockers$HomeAway == "N", na.rm = TRUE) / nrow(shockers) * 100,
+    100 - (sum(shockers$HomeAway == "N", na.rm = TRUE) / nrow(shockers) * 100)
+  )
+)
+```
+
+November in college basketball is non-conference season so it largely makes sense that a majority of these wins would occur then, but it's also the home of many MTEs (Multiple Team Events) where schools meet in neutral locations often to play multiple games, like the Maui Invitational or the brand new Players Era in Las Vegas. 
+
+```{r}
+
+combined <- combined |>
+  mutate(category = factor(category, levels = c("Not N", "N")))
+
+ggplot(combined, aes(x = dataset, y = percentage, fill = category)) +
+  geom_col() +  
+  geom_text(aes(label = paste0(round(percentage, 1), "%")), 
+            position = position_stack(vjust = 0.5),
+            color = "white", size = 4, fontface = "bold") +
+  scale_x_discrete(labels = c("upsetsnew" = "Over 25% Predicted Upsets", "shockers" = "Under 25% predicted upsets")) +
+  labs(
+    title = "Unpredictable upsets are more often on Neutral Courts",
+    subtitle = "Early season MTEs lead to more hard-to-predict upsets",
+    x = "Predicted vs. Non-predicted",
+    y = "Neutral Court Percentage",
+    fill = "Category"
+  ) +
+  scale_fill_manual(
+    values = c("N" = "lightblue", "Not N" = "gray"),
+    labels = c("N" = "Neutral Site", "Not N" = "True Home/Road")  
+  )+
+  theme_minimal()
+```
+
+I found that 9/21 games wherein the model was severely off occured on neutral courts good for almost 43% whereas in the games wherein the model predicted above 25% chance of a victory for the winning-team under 39% were on neutral courts. What does this say? Potentially that the early season just leads to a lot of hard-to-explain results, but also maybe the specific statistics I used as predictive factors are more relevant to games with a home crowd feeding off forcing the oppontent into turnovers or their team hitting big threes.
+
+
+Pivoting slightly I wanted to explore which mid-major teams have had the most sustained success in pulling off wins against their more well-resourced foes. 
+```{r}
+upsets|>
+  count(Team, sort = TRUE)
+```
+
+My results returned a lot of the usual suspects like San Diego State, Dayton, and Saint Mary's as well as a bunch of AAC teams. This is because many AAC programs have jumped ship for the Big-12, so previous conference wins against them are being classified as wins over a power program in the data. Eliminating them from the pool I explored some of the statistics from the other teams involved.
+
+One I looked at over the data's time period was KenPom's adjusted Tempo stat to see if there's a trend among these succesful mid-major programs in regards to pace of play.
+
+```{r}
+tempo <- read_csv("Tempo Statistics - Sheet1.csv")
+
+tempo <- tempo |> 
+  rename(
+    avg_tempo = `Avg Adjusted Tempo`,
+    p5wins = `Power-Five Wins`
+  )
+```
+
+```{r}
+
+
+ggplot(tempo, aes(x = avg_tempo, y = p5wins)) +
+  geom_point(alpha = 0.7) +
+   geom_vline(xintercept = 67.61, linetype = "dashed") +   annotate(
+    "text",
+    x = 67.61,
+    y = 28, 
+    label = "National Avg Tempo (67.61)",
+    vjust = -0.5,
+    size = 3
+  ) +
+    scale_x_continuous(limits = c(60, 70)) +
+  scale_y_continuous(limits = c(0, 30)) +
+  geom_text_repel(
+    aes(label = Team),
+    size = 3,
+    max.overlaps = 20
+  ) +
+  labs(
+    x = "Average Adjusted Tempo (2015-Now)",
+    y = "Power 5 Wins (2015-now)",
+    title = "Succesful Mid-Majors play near or below average tempo",
+    subtitle = "Data from teams with over 10 wins over power programs since 2014-15",
+    caption = "Author: Max Schaeffer | Data: KenPom.com"
+  ) +
+  theme_minimal()
+```
+
+I found that mostly, these teams played below or at least close to the national average for pace of play, over the course of the 11.5 seasons of data I'm looking at. The three programs with the most wins against power opponents during this time period: Saint Mary's (CA), San Diego St. and Dayton were three of the four slowest paced teams of the group.
+
+Conversely, many of the teams that played faster than the national average had future power head coaches come through the program. Nevada had Eric Musselman, Rhode Island had Danny Hurley, VCU had Will Wade and Mike Rhoades, San Francisco had Todd Golden. This didn't occur as often for the slower teams.
+
+
+There is no catch-all solution for how to pull of an upset as a mid-major and teams have taken different routes to do it. Catching a team on a neutral court, winning the turnover battle, hitting a higher percentage of threes, getting to the line more often, and grinding a team down can all be predictive factors.
+
+Sometimes, like Last November, a Colorado State team can beat TCU while turning the ball over three more times, shooting over 6% lower from beyond the arc, shooting 18 less free throws, and playing at a nearly equivalent pace. College basketball is weird. That's why I love it.
